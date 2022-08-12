@@ -58,6 +58,8 @@
       canvasWidth = Math.floor(window.innerHeight * 0.66);
     }
 
+    var iosDetected = getMobileOperatingSystem() === 'iOS';
+
     var deepAR = DeepAR({
       canvasWidth: canvasWidth,
       canvasHeight: canvasHeight,
@@ -66,8 +68,8 @@
       numberOfFaces: 1,
       footTrackingConfig: {
         poseEstimationWasm: './lib/libxzimgPoseEstimation.wasm',
-        detector: './lib/foot-detector-android.bin',
-        tracker: './lib/foot-tracker-android.bin',
+        detector: iosDetected ? './lib/foot-detector-ios.bin' : './lib/foot-detector-android.bin',
+        tracker: iosDetected ? './lib/foot-tracker-ios.bin' : './lib/foot-tracker-android.bin',
         obj: './lib/foot-model.obj',
       },
       onInitialize: function () {
@@ -169,6 +171,27 @@
         videoObjects.video.pause();
         videoObjects = {};
       }
+    }
+
+    // https://stackoverflow.com/a/21742107
+    function getMobileOperatingSystem() {
+        var userAgent = navigator.userAgent || navigator.vendor || window.opera;
+
+        // Windows Phone must come first because its UA also contains "Android"
+        if (/windows phone/i.test(userAgent)) {
+            return 'Windows Phone';
+        }
+
+        if (/android/i.test(userAgent)) {
+            return 'Android';
+        }
+
+        // iOS detection from: http://stackoverflow.com/a/9039885/177710
+        if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
+            return 'iOS';
+        }
+
+        return 'unknown';
     }
   </script>
 </body>
