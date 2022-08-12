@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en-us">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+  <title>DeepAR</title>
+  <style>
+    canvas.deepar {
+      border: 0px none;
+      background-color: black;
+      display: block;
+      margin: auto;
+      -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+    }
+
+    body {
+      margin: 0px;
+      padding: 0px;
+      background-color: black;
+    }
+
+    #loader-wrapper {
+      position: fixed;
+      top: 0px;
+      left: 0px;
+      width: 100%;
+      height: 100%;
+      background-color: black;
+    }
+
+    .center {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+      font-family: Helvetica, Arial, sans-serif;
+      color: white;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas class="deepar" id="deepar-canvas" oncontextmenu="event.preventDefault()"></canvas>
+  <div id="loader-wrapper">
+    <div class="center">Loading...</div>
+  </div>
+
+  <script type="text/javascript" src="lib/deepar.js"></script>
+  <script type="text/javascript">
+
+    var canvasHeight = window.innerHeight;
+    var canvasWidth = window.innerWidth;
+
+    // desktop, the width of the canvas is 0.66 * window height and on mobile it's fullscreen
+    if (window.innerWidth > window.innerHeight) {
+      canvasWidth = Math.floor(window.innerHeight * 0.66);
+    }
+
+    var deepAR = DeepAR({
+      canvasWidth: canvasWidth,
+      canvasHeight: canvasHeight,
+      licenseKey: 'your_license_key_goes_here',
+      canvas: document.getElementById('deepar-canvas'),
+      numberOfFaces: 1,
+      footTrackingConfig: {
+        poseEstimationWasm: './lib/libxzimgPoseEstimation.wasm',
+        detector: './lib/foot-detector-android.bin',
+        tracker: './lib/foot-tracker-android.bin',
+        obj: './lib/foot-model.obj',
+      },
+      onInitialize: function () {
+        startExternalVideo('environment');
+        deepAR.loadFootTrackingModel(function () {
+          deepAR.switchEffect(0, 'mask', './effects/Shoe', function () {
+            var loaderWrapper = document.getElementById('loader-wrapper');
+            loaderWrapper.style.display = 'none';
+          });
+        });
+      }
+    });
+
+    deepAR.onCameraPermissionAsked = function () {
+      console.log('camera permission asked');
+    };
+
+    deepAR.onCameraPermissionGranted = function () {
+      console.log('camera permission granted');
+    };
+
+    deepAR.onCameraPermissionDenied = function () {
+      console.log('camera permission denied');
+    };
+
+    deepAR.onScreenshotTaken = function (photo) {
+      console.log('screenshot taken');
+    };
+
+    deepAR.onImageVisibilityChanged = function (visible) {
+      console.log('image visible', visible);
+    };
+
+    deepAR.onFaceVisibilityChanged = function (visible) {
+      console.log('face visible', visible);
+    };
+
+    deepAR.onVideoStarted = function () {
+      console.log('video started');
+    };
+
+    deepAR.onError = function(err) {
+      console.log(err);
+    }
+
+    // Store video objects for cleanup
+    var videoObjects = {};
+
+    function startExternalVideo(facingMode) {
+      cleanupVideoObjects();
+      // create video element
+      var video = document.createElement('video');
+      video.muted = true;
+      video.loop = true;
+      video.controls = true;
+      video.setAttribute('playsinline', 'playsinline');
+      video.style.width = '100%';
+      video.style.height = '100%';
+
+      // put it somewhere in the DOM
+      var videoContainer = document.createElement('div');
+      videoContainer.appendChild(video);
+      videoContainer.style.width = '1px';
+      videoContainer.style.height = '1px';
+      videoContainer.style.position = 'absolute';
+      videoContainer.style.top = '0px';
+      videoContainer.style.left = '0px';
+      videoContainer.style['z-index'] = '-1';
+      document.body.appendChild(videoContainer);
+
+      videoObjects.videoContainer = videoContainer;
+      videoObjects.video = video;
+
+      navigator.mediaDevices.getUserMedia({ video: { facingMode } }).then(function (stream) {
+        try {
+          video.srcObject = stream;
+        } catch (error) {
+          video.src = URL.createObjectURL(stream);
+        }
+        setTimeout(function () {
+          video.play();
+        }, 50);
+      }).catch(function (error) {
+        console.log('error in video play:', error);
+      });
+
+      // tell the DeepAR SDK about our new video element
+      deepAR.setVideoElement(video, facingMode === 'user');
+    }
+
+    function cleanupVideoObjects() {
+      if (videoObjects.length > 0) {
+        videoObjects.videoContainer.parentNode.removeChild(videoObjects.videoContainer);
+        videoObjects.videoContainer = null;
+        if (videoObjects.video.srcObject) {
+          //getUserMedia starts a stream, all tracks on all streams need to be stoppedbefore calling getUserMedia again
+          videoObjects.video.srcObject.getTracks().forEach(track => track.stop())
+        }
+        videoObjects.video.pause();
+        videoObjects = {};
+      }
+    }
+  </script>
+</body>
+
+</html>
